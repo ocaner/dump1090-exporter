@@ -45,7 +45,7 @@ def build_resources(base_url: str) -> Dump1090Resources:
         base_url,
         '{}/data/receiver.json'.format(base_url),
         '{}/data/stats.json'.format(base_url),
-        '{}/data/aircraft.json'.format(base_url))
+        '{}/data.json'.format(base_url))
     return resources
 
 
@@ -159,20 +159,20 @@ class Dump1090Exporter(object):
         # Attempt to retrieve the optional lat and lon position from
         # the dump1090 receiver data. If present this data will override
         # command line configuration.
-        try:
-            receiver = await asyncio.wait_for(
-                fetch(self.dump1090urls.receiver), self.fetch_timeout)
-            if receiver:
-                if 'lat' in receiver and 'lon' in receiver:
-                    self.origin = Position(receiver['lat'], receiver['lon'])
-                    logger.info(
-                        'Origin successfully extracted from receiver data: %s',
-                        self.origin)
-        except asyncio.TimeoutError:
-            logger.error(
-                'request for dump1090 receiver data timed out')
+        #try:
+        #    receiver = await asyncio.wait_for(
+        #        fetch(self.dump1090urls.receiver), self.fetch_timeout)
+        #    if receiver:
+        #        if 'lat' in receiver and 'lon' in receiver:
+        #            self.origin = Position(receiver['lat'], receiver['lon'])
+        #            logger.info(
+        #                'Origin successfully extracted from receiver data: %s',
+        #                self.origin)
+        #except asyncio.TimeoutError:
+        #    logger.error(
+        #        'request for dump1090 receiver data timed out')
 
-        self.stats_task = asyncio.ensure_future(self.updater_stats())
+        #self.stats_task = asyncio.ensure_future(self.updater_stats())
         self.aircraft_task = asyncio.ensure_future(self.updater_aircraft())
 
     async def stop(self) -> None:
@@ -308,13 +308,17 @@ class Dump1090Exporter(object):
         :param threshold: only let aircraft seen within this threshold to
           contribute to the metrics.
         '''
+        
+        messages = 0
+        
         # Ensure aircraft dict always contains all keys, as optional
         # items are not always present.
-        for entry in aircraft['aircraft']:
+        for entry in aircraft: #['aircraft']:
+            messages += entry.get("messages", 0)
             for key in AircraftKeys:
                 entry.setdefault(key, None)
 
-        messages = aircraft['messages']
+        #messages = aircraft['messages']
 
         # 'seen' shows how long ago (in seconds before "now") a message
         # was last received from an aircraft.
@@ -326,10 +330,11 @@ class Dump1090Exporter(object):
         aircraft_max_range = 0.0
         # Filter aircraft to only those that have been seen within the
         # last n seconds to minimise contributions from aged obsevations.
-        for a in aircraft['aircraft']:
+        for a in aircraft: #['aircraft']:
             if a['seen'] < threshold:
                 aircraft_observed += 1
-            if a['seen_pos'] and a['seen_pos'] < threshold:
+            #if a['seen_pos'] and a['seen_pos'] < threshold:
+            if a['validposition'] and a['lat'] and a['lon']:
                 aircraft_with_pos += 1
                 if self.origin:
                     distance = haversine_distance(
